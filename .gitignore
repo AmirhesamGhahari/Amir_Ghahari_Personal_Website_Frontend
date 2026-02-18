@@ -7,3 +7,10 @@
 
 # Keep git files
 !.gitignore
+!package.json 
+!tsconfig.json 
+!README.md 
+!.eslintrc.json
+!next.config.mjs
+!plasmic.json
+!plasmic-init.ts
