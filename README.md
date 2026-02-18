@@ -1,25 +1,31 @@
-This is a Next.js project bootstrapped with [`create-plasmic-app`](https://www.npmjs.com/package/create-plasmic-app).
+This is a Next.js project bootstrapped with `create-plasmic-app`
 
 ## Getting Started
 
-First, run the development server:
+First, run the development server, it created the  we app on port 3000:
 
 ```bash
 npm run dev
 ```
 
-Open your browser to see the result.
+run the sync command to cync the project from plasmic web app to your local repo:
 
-You can start editing your project in Plasmic Studio. The page auto-updates as you edit the project.
+```bash
+plasmic sync --projects
+```
+
+build the final out folders and static resources for the front end of your website:
+
+```bash
+plasmic run build
+```
+
+## More On Plasmic Settings:
+
+needed changes for plasmic init settings are configured in `next.config.mjs`, `plasmic.json` and `plasmic-init.ts` files.
+
 
 ## Learn More
 
-With Plasmic, you can enable non-developers on your team to publish pages and content into your website or app.
-
-To learn more about Plasmic, take a look at the following resources:
-
 - [Plasmic Website](https://www.plasmic.app/)
 - [Plasmic Documentation](https://docs.plasmic.app/learn/)
-- [Plasmic Community Forum](https://forum.plasmic.app/)
-
-You can check out [the Plasmic GitHub repository](https://github.com/plasmicapp/plasmic) - your feedback and contributions are welcome!
