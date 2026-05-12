@@ -266,6 +266,7 @@ function MyPage() {
     </div>
   );
 }
+
 ```
 
 That HTML-looking code inside the function is JSX. React converts it into real
