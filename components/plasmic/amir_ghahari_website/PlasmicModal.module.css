@@ -1,0 +1,97 @@
+.ariaDialogTrigger:global(.__wab_instance) {
+  position: relative;
+}
+.svg__xxlV9 {
+  position: relative;
+  height: 1em;
+}
+.svg__k1Fjq {
+  position: relative;
+  height: 1em;
+}
+.ariaModal:global(.__wab_instance) {
+  background: var(--token-CYLr_YzvuZ1f);
+  display: block;
+  color: var(--token-eH0ui9Z8vdUd);
+  font-family: var(--token-uBloK88CSGs1);
+  font-size: var(--token-WKKZ-R_oK_Tf);
+  line-height: var(--token-vZJQ8NtyyRaL);
+  outline-style: none;
+  box-shadow: 0px 24px 48px -12px #00000040;
+  border-radius: var(--token-83JmIveyxKLl);
+}
+.pcls_Jf8kM-LIR_o9 {
+  background: var(--token-iK0N8RIApbaO);
+  left: 0px;
+  top: 0px;
+  z-index: 10;
+  position: fixed;
+  right: 0px;
+  bottom: 0px;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  outline: none;
+}
+.ariaDialog:global(.__wab_instance) {
+  max-width: 90vw;
+  object-fit: cover;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  outline-style: none;
+}
+.h3___5FO7I {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  font-weight: 700;
+  font-size: var(--token-NVJ7988O0UY5);
+  min-width: 0;
+  padding: var(--token-8qCN6iQxWOuL);
+}
+.scrollableContent {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: auto;
+  padding-left: var(--token-8qCN6iQxWOuL);
+  padding-right: var(--token-8qCN6iQxWOuL);
+}
+.freeBox__fbc0C {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  align-items: flex-start;
+  justify-content: flex-start;
+  row-gap: var(--token-1jgmC4jEz5ba);
+}
+.text__m865Z {
+  position: relative;
+}
+.freeBox__aFCn {
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  min-width: 0;
+  padding: var(--token-8qCN6iQxWOuL);
+}
+.svg__aeF2U {
+  position: relative;
+  height: 1em;
+}
+.text___5QdGh {
+  padding-left: 0px;
+}
+.svg__qkXmO {
+  position: relative;
+  height: 1em;
+}
