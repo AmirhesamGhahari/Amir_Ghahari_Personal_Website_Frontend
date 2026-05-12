@@ -13,4 +13,4 @@ phases:
 
   post_build:
     commands:
-      - aws s3 sync out/ s3:/amir-ghahari-dev-frintend-cloudbuild-bucket  --delete
+      - aws s3 sync out/ s3://amir-ghahari-dev-frintend-cloudbuild-bucket --delete
