@@ -246,6 +246,14 @@ Resources:
                 TemplatePath: SourceArtifact::infra/pipeline.yaml
                 Capabilities: CAPABILITY_NAMED_IAM
                 RoleArn: !GetAtt CloudFormationDeployRole.Arn
+                ParameterOverrides: !Sub |
+                  {
+                    "GitHubOwner": "${GitHubOwner}",
+                    "GitHubRepo": "${GitHubRepo}",
+                    "GitHubBranch": "${GitHubBranch}",
+                    "WebsiteBucketName": "${WebsiteBucketName}",
+                    "ArtifactBucketName": "${ArtifactBucketName}"
+                  }
               InputArtifacts:
                 - Name: SourceArtifact
 
