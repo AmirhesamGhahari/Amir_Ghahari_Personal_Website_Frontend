@@ -1,8 +1,131 @@
-# CI/CD Deployment Guide — GitHub → AWS → S3 + CloudFront
+# CI/CD Deployment Guide — GitHub → AWS → S3
 
 This file explains how to set up automated deployment for this website.
 Every time you push code to the `main` branch on GitHub, AWS automatically
-builds the site and deploys it to S3, then clears the CloudFront cache.
+builds the site and deploys it to S3.
+
+---
+
+## Part 1 — Automated Setup with Infrastructure as Code (Recommended)
+
+Instead of clicking through the AWS Console manually, the entire AWS setup is defined
+in `infra/pipeline.yaml` (a CloudFormation template). You run one command once to
+bootstrap everything, and after that the pipeline manages itself.
+
+### What gets created automatically
+
+| AWS Resource | Purpose |
+|---|---|
+| CodeStar Connection | Secure bridge between AWS and your GitHub repo |
+| S3 website bucket | Stores the built HTML/CSS/JS files that visitors load |
+| S3 artifact bucket | CodePipeline's private scratchpad to pass code between stages |
+| IAM roles (3) | Permission identities for CodeBuild, CodePipeline, and CloudFormation |
+| CodeBuild project | The build server that runs `npm install`, `npm run build`, `aws s3 sync` |
+| CodePipeline | The orchestrator — watches GitHub and runs the 3 stages automatically |
+
+### Files involved
+
+| File | Role |
+|---|---|
+| `infra/pipeline.yaml` | CloudFormation template — defines all AWS resources above |
+| `buildspec.yml` | CodeBuild task list — the commands that run during every build |
+
+### Prerequisites
+
+1. **AWS CLI installed** — [install guide](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+2. **AWS CLI configured** with your credentials:
+   ```bash
+   aws configure
+   ```
+   You'll need your AWS Access Key ID, Secret Access Key, and default region (`us-east-1`).
+
+### Parameters — values you supply at deploy time
+
+| Parameter | What it is | Example |
+|---|---|---|
+| `GitHubOwner` | Your GitHub username | `amirhesamghahari` |
+| `GitHubRepo` | The repository name | `amir-ghahari-dev-frontend-repo` |
+| `GitHubBranch` | Branch to deploy from | `main` |
+| `WebsiteBucketName` | S3 bucket for the site files — globally unique | `amir-ghahari-website` |
+| `ArtifactBucketName` | S3 bucket for pipeline artifacts — globally unique | `amir-ghahari-pipeline-artifacts` |
+
+S3 bucket names must be unique across all AWS accounts worldwide. A pattern like
+`yourname-website` or `yourname-pipeline-artifacts` is usually safe.
+
+### Step 1 — Bootstrap (run once, ever)
+
+Run this command from your terminal in the project root. Fill in your real values:
+
+```bash
+aws cloudformation deploy \
+  --template-file infra/pipeline.yaml \
+  --stack-name portfolio-cicd \
+  --parameter-overrides \
+      GitHubOwner=YOUR_GITHUB_USERNAME \
+      GitHubRepo=YOUR_REPO_NAME \
+      GitHubBranch=main \
+      WebsiteBucketName=amir-ghahari-website \
+      ArtifactBucketName=amir-ghahari-pipeline-artifacts \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region us-east-1
+```
+
+`--capabilities CAPABILITY_NAMED_IAM` is required whenever a CloudFormation template
+creates IAM roles with specific names. Without this flag the command will fail.
+
+This takes about 3–5 minutes. CloudFormation creates all resources in the correct order.
+
+### Step 2 — Activate the GitHub connection (one-time manual click)
+
+After the stack deploys, the GitHub connection is in **Pending** state. AWS requires
+a human to authorize GitHub access via OAuth — this cannot be scripted.
+
+1. Go to: **AWS Console → CodePipeline → Settings → Connections**
+2. Find `amir-portfolio-github` (status: Pending)
+3. Click **"Update pending connection"** → authorize via GitHub OAuth
+4. Status changes to **"Available"**
+
+This is a one-time step. After this, everything is fully automated.
+
+### Step 3 — Push to trigger the first run
+
+Push any commit to `main`. The pipeline will run its 3 stages automatically:
+
+```
+Stage 1 — Source:           Downloads your repo from GitHub
+Stage 2 — DeployInfra:      Re-deploys infra/pipeline.yaml (no-op on first run if unchanged)
+Stage 3 — Build:            Runs buildspec.yml → npm install → npm build → aws s3 sync
+```
+
+Watch progress at: **AWS Console → CodePipeline → portfolio-cicd-pipeline**
+
+### Step 4 — Get your website URL
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name portfolio-cicd \
+  --query "Stacks[0].Outputs"
+```
+
+The `WebsiteBucketURL` output is the S3 static website endpoint where your site is live.
+
+### How it works from here
+
+| What you want to do | What to do |
+|---|---|
+| Deploy new site content | Push to `main` — pipeline runs automatically |
+| Change AWS infrastructure | Edit `infra/pipeline.yaml` → push to `main` → Stage 2 applies the changes |
+| Change build commands | Edit `buildspec.yml` → push to `main` |
+| Tear everything down | `aws cloudformation delete-stack --stack-name portfolio-cicd --region us-east-1` |
+
+**Self-updating pipeline:** Stage 2 re-deploys `infra/pipeline.yaml` on every push.
+If you edit the file (add a permission, change a resource), those changes are applied
+automatically before Stage 3 runs. No manual `aws cloudformation deploy` ever needed again
+after the first bootstrap.
+
+---
+
+## Part 2 — Manual Setup Reference (Console walkthrough)
 
 ---
 
