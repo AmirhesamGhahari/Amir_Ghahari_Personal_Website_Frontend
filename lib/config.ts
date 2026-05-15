@@ -13,7 +13,7 @@ export const config = {
   // ----------------------------------------------------------
   // AWS API Gateway endpoint for the contact form
   // ----------------------------------------------------------
-  contactApiUrl: "YOUR_AWS_API_GATEWAY_URL_HERE",
+  contactApiUrl: "api.amir-ghahari.dev",
 
   // ----------------------------------------------------------
   // Personal info

@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Frontend infrastructure for the portfolio site.
+  Creates a private S3 bucket to store built site files.
+  This stack is deployed and updated automatically by the CI/CD pipeline (infra/cicd.yaml).
+  The bucket is intentionally private — CloudFront (managed by the backend stack) accesses
+  it via OAC (Origin Access Control). The backend stack owns the bucket policy.
+
+Parameters:
+  WebsiteBucketName:
+    Type: String
+    Description: S3 bucket name for the site files — must be globally unique (e.g. amir-ghahari-website)
+
+Resources:
+
+  # Private S3 bucket — no public access, no website hosting, no bucket policy here.
+  # AWS S3 defaults block all public access, so no PublicAccessBlockConfiguration needed.
+  # The backend CloudFormation stack adds the OAC bucket policy and the CloudFront distribution.
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref WebsiteBucketName
+
+Outputs:
+
+  WebsiteBucketName:
+    Description: Name of the private S3 bucket storing site files
+    Value: !Ref WebsiteBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-bucket-name'
+
+  WebsiteBucketArn:
+    Description: ARN of the private S3 bucket — used by the backend stack to write the OAC bucket policy
+    Value: !GetAtt WebsiteBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-bucket-arn'

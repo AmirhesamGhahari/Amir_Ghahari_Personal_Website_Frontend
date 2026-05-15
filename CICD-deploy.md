@@ -8,26 +8,61 @@ builds the site and deploys it to S3.
 
 ## Part 1 — Automated Setup with Infrastructure as Code (Recommended)
 
-Instead of clicking through the AWS Console manually, the entire AWS setup is defined
-in `infra/pipeline.yaml` (a CloudFormation template). You run one command once to
-bootstrap everything, and after that the pipeline manages itself.
+Instead of clicking through the AWS Console manually, the entire AWS setup is split across
+two CloudFormation templates. You run one command once to bootstrap, and after that the
+pipeline manages both stacks automatically.
+
+### Two-stack architecture
+
+The infrastructure is intentionally split into two separate CloudFormation stacks:
+
+| Stack | Template | What it contains |
+|---|---|---|
+| `portfolio-cicd` | `infra/cicd.yaml` | CodePipeline, CodeBuild, IAM roles, artifact bucket, CodeStar connection |
+| `portfolio-frontend` | `infra/frontend.yaml` | The private S3 bucket that stores your built site files |
+
+**Why split?** CI/CD infrastructure (pipelines, IAM roles) rarely changes and is unrelated
+to website infrastructure (the S3 bucket). Keeping them separate means you can update,
+inspect, or delete them independently. The backend team's CloudFormation stack also needs
+to reference the frontend stack's outputs to attach CloudFront via OAC.
+
+### Why the S3 bucket is private (OAC)
+
+The S3 bucket is **private** — no public access, no public bucket policy. The backend
+repo's CloudFormation stack sets up CloudFront with OAC (Origin Access Control), which is
+the modern secure approach:
+
+- **Old way:** Public S3 bucket → CloudFront points to the S3 website endpoint. Anyone
+  can bypass CloudFront and hit S3 directly.
+- **OAC way:** Private S3 bucket → CloudFront points to the S3 REST endpoint, signing
+  every request internally. Only CloudFront can read the files. The backend stack adds
+  the bucket policy that allows this. Visitors can only access files through CloudFront.
+
+The frontend stack exports its bucket name and ARN so the backend stack can import them:
+```yaml
+# In the backend stack:
+BucketArn: !ImportValue 'portfolio-frontend-bucket-arn'
+```
 
 ### What gets created automatically
 
-| AWS Resource | Purpose |
-|---|---|
-| CodeStar Connection | Secure bridge between AWS and your GitHub repo |
-| S3 website bucket | Stores the built HTML/CSS/JS files that visitors load |
-| S3 artifact bucket | CodePipeline's private scratchpad to pass code between stages |
-| IAM roles (3) | Permission identities for CodeBuild, CodePipeline, and CloudFormation |
-| CodeBuild project | The build server that runs `npm install`, `npm run build`, `aws s3 sync` |
-| CodePipeline | The orchestrator — watches GitHub and runs the 3 stages automatically |
+| AWS Resource | Stack | Purpose |
+|---|---|---|
+| CodeStar Connection | cicd | Secure bridge between AWS and your GitHub repo |
+| S3 artifact bucket | cicd | CodePipeline's private scratchpad to pass code between stages |
+| IAM roles (3) | cicd | Permission identities for CodeBuild, CodePipeline, and CloudFormation |
+| CodeBuild project | cicd | Runs `npm install`, `npm run build`, `aws s3 sync` |
+| CodePipeline | cicd | Watches GitHub and runs the 3 stages automatically |
+| S3 website bucket (private) | frontend | Stores the built HTML/CSS/JS files |
 
 ### Files involved
 
 | File | Role |
 |---|---|
-| `infra/pipeline.yaml` | CloudFormation template — defines all AWS resources above |
+| `infra/config.sh` | **Your config** — edit this with your bucket names, GitHub details, etc. |
+| `infra/deploy.sh` | Bootstrap script — run this once; reads values from `config.sh` |
+| `infra/cicd.yaml` | CI/CD CloudFormation template — defines the pipeline and build resources |
+| `infra/frontend.yaml` | Frontend CloudFormation template — defines the private S3 bucket |
 | `buildspec.yml` | CodeBuild task list — the commands that run during every build |
 
 ### Prerequisites
@@ -41,39 +76,49 @@ bootstrap everything, and after that the pipeline manages itself.
 
 ### Parameters — values you supply at deploy time
 
+These are only needed for the one-time bootstrap command. After that the pipeline passes
+them automatically on every subsequent run.
+
 | Parameter | What it is | Example |
 |---|---|---|
 | `GitHubOwner` | Your GitHub username | `amirhesamghahari` |
 | `GitHubRepo` | The repository name | `amir-ghahari-dev-frontend-repo` |
 | `GitHubBranch` | Branch to deploy from | `main` |
-| `WebsiteBucketName` | S3 bucket for the site files — globally unique | `amir-ghahari-website` |
-| `ArtifactBucketName` | S3 bucket for pipeline artifacts — globally unique | `amir-ghahari-pipeline-artifacts` |
+| `WebsiteBucketName` | S3 bucket name for site files — globally unique | `amir-ghahari-website` |
+| `ArtifactBucketName` | S3 bucket name for pipeline artifacts — globally unique | `amir-ghahari-pipeline-artifacts` |
+| `FrontendStackName` | Name of the frontend CloudFormation stack | `portfolio-frontend` |
 
-S3 bucket names must be unique across all AWS accounts worldwide. A pattern like
-`yourname-website` or `yourname-pipeline-artifacts` is usually safe.
+S3 bucket names must be unique across all AWS accounts worldwide.
 
-### Step 1 — Bootstrap (run once, ever)
+### Step 1 — Fill in your config values
 
-Run this command from your terminal in the project root. Fill in your real values:
+Open `infra/config.sh` and set your values:
 
 ```bash
-aws cloudformation deploy \
-  --template-file infra/pipeline.yaml \
-  --stack-name portfolio-cicd \
-  --parameter-overrides \
-      GitHubOwner=YOUR_GITHUB_USERNAME \
-      GitHubRepo=YOUR_REPO_NAME \
-      GitHubBranch=main \
-      WebsiteBucketName=amir-ghahari-website \
-      ArtifactBucketName=amir-ghahari-pipeline-artifacts \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-1
+GITHUB_OWNER="amirhesamghahari"          # your GitHub username
+GITHUB_REPO="amir-ghahari-dev-frontend-repo"  # your repo name
+WEBSITE_BUCKET_NAME="amir-ghahari-website"
+ARTIFACT_BUCKET_NAME="amir-ghahari-pipeline-artifacts"
+# ... (stack names and region already have sensible defaults)
 ```
 
-`--capabilities CAPABILITY_NAMED_IAM` is required whenever a CloudFormation template
-creates IAM roles with specific names. Without this flag the command will fail.
+This is the only file you ever need to edit for configuration. All other scripts and
+CloudFormation commands read from it automatically.
 
-This takes about 3–5 minutes. CloudFormation creates all resources in the correct order.
+### Step 2 — Bootstrap (run once, ever)
+
+This deploys only the CI/CD stack. The frontend stack (`portfolio-frontend`) is created
+automatically by the pipeline on its first run.
+
+```bash
+./infra/deploy.sh
+```
+
+Behind the scenes this runs `aws cloudformation deploy` with all the values from
+`infra/config.sh`. Takes about 3–5 minutes.
+
+If you ever need to update the CI/CD stack manually (e.g. after a failed pipeline),
+you can re-run the same command — it's safe to run multiple times.
 
 ### Step 2 — Activate the GitHub connection (one-time manual click)
 
@@ -92,36 +137,47 @@ This is a one-time step. After this, everything is fully automated.
 Push any commit to `main`. The pipeline will run its 3 stages automatically:
 
 ```
-Stage 1 — Source:           Downloads your repo from GitHub
-Stage 2 — DeployInfra:      Re-deploys infra/pipeline.yaml (no-op on first run if unchanged)
-Stage 3 — Build:            Runs buildspec.yml → npm install → npm build → aws s3 sync
+Stage 1 — Source:      Downloads your repo from GitHub
+
+Stage 2 — DeployInfrastructure (two actions run in parallel):
+  UpdateCICDStack:     Re-deploys infra/cicd.yaml     → portfolio-cicd stack (self-update)
+  UpdateFrontendStack: Deploys   infra/frontend.yaml  → portfolio-frontend stack
+                       (first run: creates the private S3 bucket)
+                       (subsequent runs: updates if changed, no-op if unchanged)
+
+Stage 3 — Build:       Runs buildspec.yml → npm install → npm build → aws s3 sync
+                       (by now the S3 bucket exists, so the sync succeeds)
 ```
 
 Watch progress at: **AWS Console → CodePipeline → portfolio-cicd-pipeline**
 
-### Step 4 — Get your website URL
+### Step 4 — Get your bucket name
+
+The `portfolio-frontend` stack outputs the bucket name and ARN:
 
 ```bash
 aws cloudformation describe-stacks \
-  --stack-name portfolio-cicd \
+  --stack-name portfolio-frontend \
   --query "Stacks[0].Outputs"
 ```
 
-The `WebsiteBucketURL` output is the S3 static website endpoint where your site is live.
+Your site files will be in that bucket. The backend team's CloudFront stack serves them.
 
 ### How it works from here
 
 | What you want to do | What to do |
 |---|---|
 | Deploy new site content | Push to `main` — pipeline runs automatically |
-| Change AWS infrastructure | Edit `infra/pipeline.yaml` → push to `main` → Stage 2 applies the changes |
+| Change CI/CD infrastructure | Edit `infra/cicd.yaml` → push to `main` → Stage 2 self-updates |
+| Change frontend infrastructure | Edit `infra/frontend.yaml` → push to `main` → Stage 2 updates it |
 | Change build commands | Edit `buildspec.yml` → push to `main` |
-| Tear everything down | `aws cloudformation delete-stack --stack-name portfolio-cicd --region us-east-1` |
+| Tear down CI/CD only | `aws cloudformation delete-stack --stack-name portfolio-cicd --region us-east-1` |
+| Tear down frontend only | `aws cloudformation delete-stack --stack-name portfolio-frontend --region us-east-1` |
+| Tear down everything | Delete `portfolio-frontend` first, then `portfolio-cicd` |
 
-**Self-updating pipeline:** Stage 2 re-deploys `infra/pipeline.yaml` on every push.
-If you edit the file (add a permission, change a resource), those changes are applied
-automatically before Stage 3 runs. No manual `aws cloudformation deploy` ever needed again
-after the first bootstrap.
+**Self-updating pipeline:** Stage 2 re-deploys both stacks on every push. If you edit
+either infra file, those changes are applied automatically before Stage 3 runs.
+No manual `aws cloudformation deploy` ever needed again after the first bootstrap.
 
 ---
 
