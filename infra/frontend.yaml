@@ -6,6 +6,7 @@ Description: >
   The bucket is intentionally private — CloudFront (managed by the backend stack) accesses
   it via OAC (Origin Access Control). The backend stack owns the bucket policy.
 
+
 Parameters:
   WebsiteBucketName:
     Type: String
