@@ -25,7 +25,7 @@ Parameters:
 
   WebsiteBucketName:
     Type: String
-    Default: amir-ghahari-website-frontend-resources
+    Default: amirghahari-website-frontend-resources
     Description: S3 bucket name for the site files — must match the name in infra/frontend.yaml
 
   GithubConnectionName:
@@ -35,19 +35,17 @@ Parameters:
 
   ArtifactBucketName:
     Type: String
-    Default: amir-ghahari-frontend-pipeline-artifacts
+    Default: amirghahari-website-frontend-pipeline-artifacts
     Description: S3 bucket name for CodePipeline artifacts — must be globally unique
 
-  FrontendStackName:
+  FundationStackName:
     Type: String
-    Default: amir-ghahari-website-frontend
+    Default: amirghahari-frontend-fundation
     Description: CloudFormation stack name for infra/frontend.yaml (the website S3 bucket stack)
 
 Resources:
 
   # ── 1. GitHub connection ────────────────────────────────────────────────────
-  # Created in PENDING state. After the stack deploys, go to:
-  # AWS Console → CodePipeline → Settings → Connections → Update pending connection
   GithubConnection:
     Type: AWS::CodeStarConnections::Connection
     Properties:
@@ -62,10 +60,6 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
-  # ── 3. IAM role for CloudFormation ──────────────────────────────────────────
-  # CloudFormation assumes this role when Stage 2 deploys infra/cicd.yaml and
-  # infra/frontend.yaml. Needs AdministratorAccess because it creates IAM roles,
-  # S3 buckets, CodeBuild, CodePipeline, and CodeStar resources.
   CloudFormationDeployRole:
     Type: AWS::IAM::Role
     Properties:
@@ -79,6 +73,9 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: app
+          Value: amirghahari-website-frontend
 
   # ── 4. IAM role for CodeBuild ───────────────────────────────────────────────
   CodeBuildRole:
@@ -92,35 +89,11 @@ Resources:
             Principal:
               Service: codebuild.amazonaws.com
             Action: sts:AssumeRole
-      Policies:
-        - PolicyName: CodeBuildPermissions
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: '*'
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:GetObjectVersion
-                  - s3:ListBucket
-                Resource:
-                  - !Sub 'arn:aws:s3:::${ArtifactBucket}'
-                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
-              # The website bucket is private but CodeBuild accesses it via IAM,
-              # not public access — so these permissions still work fine.
-              - Effect: Allow
-                Action:
-                  - s3:PutObject
-                  - s3:DeleteObject
-                  - s3:ListBucket
-                Resource:
-                  - !Sub 'arn:aws:s3:::${WebsiteBucketName}'
-                  - !Sub 'arn:aws:s3:::${WebsiteBucketName}/*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: app
+          Value: amirghahari-website-frontend
 
   # ── 5. IAM role for CodePipeline ────────────────────────────────────────────
   CodePipelineRole:
@@ -134,43 +107,11 @@ Resources:
             Principal:
               Service: codepipeline.amazonaws.com
             Action: sts:AssumeRole
-      Policies:
-        - PolicyName: CodePipelinePermissions
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action: codestar-connections:UseConnection
-                Resource: !Ref GithubConnection
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:GetBucketVersioning
-                  - s3:GetObjectVersion
-                  - s3:ListBucket
-                Resource:
-                  - !Sub 'arn:aws:s3:::${ArtifactBucket}'
-                  - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
-              - Effect: Allow
-                Action:
-                  - codebuild:BatchGetBuilds
-                  - codebuild:StartBuild
-                Resource: !GetAtt BuildProject.Arn
-              - Effect: Allow
-                Action:
-                  - cloudformation:CreateStack
-                  - cloudformation:UpdateStack
-                  - cloudformation:DescribeStacks
-                  - cloudformation:DescribeStackEvents
-                  - cloudformation:GetTemplate
-                  - cloudformation:ValidateTemplate
-                Resource: '*'
-              - Effect: Allow
-                Action: iam:PassRole
-                Resource:
-                  - !GetAtt CodeBuildRole.Arn
-                  - !GetAtt CloudFormationDeployRole.Arn
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      Tags:
+        - Key: app
+          Value: amirghahari-website-frontend
 
   # ── 6. CodeBuild project ─────────────────────────────────────────────────────
   BuildProject:
@@ -219,11 +160,6 @@ Resources:
               OutputArtifacts:
                 - Name: SourceArtifact
 
-        # Stage 2 — two parallel CloudFormation actions
-        # Both run at the same time, both read from SourceArtifact.
-        # Action 1 self-updates this CI/CD stack from infra/cicd.yaml.
-        # Action 2 creates/updates the frontend stack from infra/frontend.yaml.
-        # Stage 3 only starts after both actions complete successfully.
         - Name: DeployInfrastructure
           Actions:
             - Name: UpdateCICDStack
@@ -236,6 +172,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 StackName: !Sub '${AWS::StackName}'
                 TemplatePath: SourceArtifact::infra/cicd.yaml
+                TemplateConfiguration: 'SourceArtifact::infra/stack-tags.json'
                 Capabilities: CAPABILITY_NAMED_IAM
                 RoleArn: !GetAtt CloudFormationDeployRole.Arn
                 ParameterOverrides: !Sub |
@@ -245,7 +182,7 @@ Resources:
                     "GitHubBranch": "${GitHubBranch}",
                     "WebsiteBucketName": "${WebsiteBucketName}",
                     "ArtifactBucketName": "${ArtifactBucketName}",
-                    "FrontendStackName": "${FrontendStackName}"
+                    "FundationStackName": "${FundationStackName}"
                   }
               InputArtifacts:
                 - Name: SourceArtifact
@@ -259,8 +196,9 @@ Resources:
                 Version: '1'
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Ref FrontendStackName
+                StackName: !Ref FundationStackName
                 TemplatePath: SourceArtifact::infra/frontend.yaml
+                TemplateConfiguration: 'SourceArtifact::infra/stack-tags.json'
                 RoleArn: !GetAtt CloudFormationDeployRole.Arn
                 ParameterOverrides: !Sub '{"WebsiteBucketName": "${WebsiteBucketName}"}'
               InputArtifacts:

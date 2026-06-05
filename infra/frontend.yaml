@@ -10,6 +10,7 @@ Description: >
 Parameters:
   WebsiteBucketName:
     Type: String
+    Default: amirghahari-website-frontend-resources
     Description: S3 bucket name for the site files — must be globally unique (e.g. amir-ghahari-website)
 
 Resources:

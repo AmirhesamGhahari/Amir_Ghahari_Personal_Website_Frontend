@@ -1,0 +1,10 @@
+{
+  "GITHUB_OWNER": "AmirhesamGhahari",
+  "GITHUB_REPO": "Amir_Ghahari_Personal_Website_Frontend",
+  "GITHUB_BRANCH": "main",
+  "WEBSITE_BUCKET_NAME": "amirghahari-website-frontend-resources",
+  "ARTIFACT_BUCKET_NAME": "amirghahari-website-frontend-pipeline-artifacts",
+  "CICD_STACK_NAME": "amirghahari-frontend-cicd",
+  "Fundation_STACK_NAME": "amirghahari-frontend-fundation",
+  "AWS_REGION": "ca-central-1"
+}
