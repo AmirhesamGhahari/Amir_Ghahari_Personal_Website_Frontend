@@ -25,7 +25,7 @@ Parameters:
 
   WebsiteBucketName:
     Type: String
-    Default: amirghahari-website-frontend-resources
+    Default: amirghahari-website-frontend-contexts
     Description: S3 bucket name for the site files — must match the name in infra/frontend.yaml
 
   GithubConnectionName:
@@ -38,9 +38,9 @@ Parameters:
     Default: amirghahari-website-frontend-pipeline-artifacts
     Description: S3 bucket name for CodePipeline artifacts — must be globally unique
 
-  FundationStackName:
+  FoundationStackName:
     Type: String
-    Default: amirghahari-frontend-fundation
+    Default: amirghahari-frontend-foundation
     Description: CloudFormation stack name for infra/frontend.yaml (the website S3 bucket stack)
 
 Resources:
@@ -182,7 +182,7 @@ Resources:
                     "GitHubBranch": "${GitHubBranch}",
                     "WebsiteBucketName": "${WebsiteBucketName}",
                     "ArtifactBucketName": "${ArtifactBucketName}",
-                    "FundationStackName": "${FundationStackName}"
+                    "FoundationStackName": "${FoundationStackName}"
                   }
               InputArtifacts:
                 - Name: SourceArtifact
@@ -196,7 +196,7 @@ Resources:
                 Version: '1'
               Configuration:
                 ActionMode: CREATE_UPDATE
-                StackName: !Ref FundationStackName
+                StackName: !Ref FoundationStackName
                 TemplatePath: SourceArtifact::infra/frontend.yaml
                 TemplateConfiguration: 'SourceArtifact::infra/stack-tags.json'
                 RoleArn: !GetAtt CloudFormationDeployRole.Arn
